@@ -34,11 +34,15 @@ void setup()
   pinMode(pinRed, OUTPUT);
   pinMode(pinGreen, OUTPUT);
   pinMode(pinBlue, OUTPUT);
-  pinMode(pinCLK, INPUT);
-  pinMode(pinDT, INPUT);
+  pinMode(pinCLK, INPUT_PULLUP);
+  pinMode(pinDT, INPUT_PULLUP);
   pinMode(pinSW, INPUT_PULLUP);
 
   attachInterrupt(0, isr, FALLING);
+
+  digitalWrite(pinCLK, HIGH);
+  digitalWrite(pinDT, HIGH);
+  digitalWrite(pinSW, HIGH);
   
   //randomSeed(analogRead(0));
   Red = LedVal[((virtualPosition*10)+120)%360];
@@ -55,9 +59,9 @@ void setup()
 // Interrupt service routine is executed when a HIGH to LOW transition is detected on CLK
 void isr ()  {
     if (!digitalRead(pinDT))
-        virtualPosition = virtualPosition + 1;
-    else
         virtualPosition = virtualPosition - 1;
+    else
+        virtualPosition = virtualPosition + 1;
     } // isr
     
 //this function will make the LED dim once the Parallax Sound Impact Sensor sends a 1 signal, and then return to it’s original brightness.
