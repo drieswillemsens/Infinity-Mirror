@@ -8,6 +8,10 @@
 #define pinCLK 2
 #define pinDT 4
 #define pinSW 5
+//Program pins
+#define pinP1 A2
+#define pinP2 A1
+#define pinP3 A0
 
 //RGB strip variables
 int Red;
@@ -23,8 +27,18 @@ int LedVal[] = {0,0,0,0,0,1,1,2,2,3,4,5,6,7,8,9,11,12,13,15,17,18,20,22,24,26,28
 volatile int virtualPosition = 0;
 volatile int lastPosition;
 
-//unsigned long previousMillis = 0;
-//const long interval = 30000; //interval tussen kleurveranderingen
+//Program status variable
+int Program = 1;
+
+unsigned long dimMillis = 0;
+const int dimInterval = 50; //Time the RGB strip needs to be dimmed
+
+//Switch variables
+unsigned long Debounce = 0;
+const int debounceDelay = 50;
+int lastButtonState = HIGH;
+
+const long interval = 30000; //interval between color changes
 
 void setup()
 {
@@ -37,6 +51,9 @@ void setup()
   pinMode(pinCLK, INPUT_PULLUP);
   pinMode(pinDT, INPUT_PULLUP);
   pinMode(pinSW, INPUT_PULLUP);
+  pinMode(pinP1, OUTPUT);
+  pinMode(pinP2, OUTPUT);
+  pinMode(pinP3, OUTPUT);
 
   attachInterrupt(0, isr, FALLING);
 
@@ -45,18 +62,29 @@ void setup()
   digitalWrite(pinSW, HIGH);
   
   //randomSeed(analogRead(0));
-  Red = LedVal[((virtualPosition*10)+120)%360];
-  Green = LedVal[virtualPosition*10];
-  Blue = LedVal[((virtualPosition*10)+240)%360];
+  //Red = LedVal[((virtualPosition*10)+120)%360];
+  //Green = LedVal[virtualPosition*10];
+  //Blue = LedVal[((virtualPosition*10)+240)%360];
   
   /*newRed = Red;
   newGreen = Green;
   newBlue = Blue;*/
 
+  //Bootup sequence (ligth up LED's one by one)
+  digitalWrite(pinP1, HIGH);
+  delay(1000);
+  digitalWrite(pinP1, LOW);
+  digitalWrite(pinP2, HIGH);
+  delay(1000);
+  digitalWrite(pinP2, LOW);
+  digitalWrite(pinP3, HIGH);
+  delay(1000);
+  digitalWrite(pinP3, LOW);
+
   Serial.println("Start");
 }
 
-// Interrupt service routine is executed when a HIGH to LOW transition is detected on CLK
+// Interrupt service routine is executed when a HIGH to LOW transition is detected on CLK of the rotary encoder
 void isr ()  {
     if (!digitalRead(pinDT))
         virtualPosition = virtualPosition - 1;
@@ -64,73 +92,79 @@ void isr ()  {
         virtualPosition = virtualPosition + 1;
     } // isr
     
-//this function will make the LED dim once the Parallax Sound Impact Sensor sends a 1 signal, and then return to it’s original brightness.
 void loop()
 {
-  //unsigned long currentMillis = millis();
 
+  //If knob has been turned, change the RGB values for the LED strip
   if(virtualPosition != lastPosition) {
-    Serial.println(virtualPosition);
     virtualPosition = 36 + virtualPosition;
     virtualPosition = virtualPosition % 36;
     lastPosition = virtualPosition;
+    Serial.print("RGB value: ");
     Serial.println(virtualPosition);
 
     Red = LedVal[((virtualPosition*10)+120)%360];
     Green = LedVal[virtualPosition*10];
-    Blue = LedVal[((virtualPosition*10)+240)%360];    
-  }
-  /*//Every interval calculate a new color
-  if(currentMillis - previousMillis >= interval)
-  {
-    previousMillis = currentMillis;
+    Blue = LedVal[((virtualPosition*10)+240)%360];
 
-    newRed = random(255);
-    newGreen = random(255);
-    newBlue = random(255);
+    Serial.print("Red: ");
+    Serial.println(Red);
+    Serial.print("Green: ");
+    Serial.println(Green);
+    Serial.print("Blue: ");
+    Serial.println(Blue);
   }
 
-  //Fade to the new color
-  //Red
-  if(newRed > Red)
-  {
-    Red += 1;
+  //If knob has been pressed, change the program status
+  int ButtonState = digitalRead(pinSW);
+  
+  if (ButtonState != lastButtonState){
+    //Debounce = millis();
+    /*}
+  if (millis() > Debounce + debounceDelay)*/
+    lastButtonState = ButtonState;
+    if(lastButtonState == LOW) {
+      Program = Program + 1;
+      Serial.print("Program: ");
+      Serial.println(Program);
+    }
   }
-  else if(newRed < Red)
-  {
-    Red -= 1;
-  }
-  //Green
-  if(newGreen > Green)
-  {
-    Green += 1;
-  }
-  else if(newGreen < Green)
-  {
-    Green -= 1;
-  }
-  //Blue
-  if(newBlue > Blue)
-  {
-    Blue += 1;
-  }
-  else if(newBlue < Blue)
-  {
-    Blue -= 1;
-  }*/
 
-  //If sound detected, dim the led strip
+  //If sound detected, set dimMillis to current millis
   boolean soundstate = digitalRead(pinMicro);
   if (soundstate == 0) {
-         analogWrite(pinRed, 0);
-         analogWrite(pinGreen, 0);
-         analogWrite(pinBlue, 0);
-         delay(50);
+    dimMillis = millis();
   }
-  else{
   
-    analogWrite(pinRed, Red);
-    analogWrite(pinGreen, Green);
-    analogWrite(pinBlue, Blue);
+  //Execute program according to Program status
+  switch (Program){
+    case 1:
+      digitalWrite(pinP1, HIGH);
+      digitalWrite(pinP2, LOW);
+      digitalWrite(pinP3, LOW);
+      //As long as the interval is not passed dim the RGB strip
+      if (millis() < dimMillis + dimInterval) {
+        analogWrite(pinRed, 0);
+        analogWrite(pinGreen, 0);
+        analogWrite(pinBlue, 0);
+      }
+      else{
+        analogWrite(pinRed, Red);
+        analogWrite(pinGreen, Green);
+        analogWrite(pinBlue, Blue);
+      }
+      break;
+    case 2:
+      digitalWrite(pinP1, LOW);
+      digitalWrite(pinP2, HIGH);
+      digitalWrite(pinP3, LOW);
+      break;
+    case 3:
+      digitalWrite(pinP1, LOW);
+      digitalWrite(pinP2, LOW);
+      digitalWrite(pinP3, HIGH);
+      break;
+    case 4:
+      Program = 1;
   }
 }
